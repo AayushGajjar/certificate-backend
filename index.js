@@ -1,26 +1,51 @@
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
+const express = require("express");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
-// List of valid certificate names (no extension)
-const validNames = ['Alice', 'Bob', 'Charlie'];
+// Directory where certificates are stored
+const certificatesDir = path.join(__dirname, "certificates");
 
-app.get('/certificate', (req, res) => {
-  const name = req.query.name?.trim();
-
-  if (!name || !validNames.includes(name)) {
-    return res.status(404).send('Certificate not found');
-  }
-
-  const filePath = path.join(__dirname, 'certificates', `${name}.pdf`);
-  res.download(filePath);
+// Enable CORS for frontend access
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
 });
 
-const PORT = process.env.PORT || 3000;
+// 🔹 Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).send("Server is up");
+});
+
+// 🔹 Certificate download endpoint
+app.get("/certificate", (req, res) => {
+  console.log("Received request for certificate download");
+  const name = req.query.name;
+
+  if (!name) {
+    return res.status(400).send("Missing 'name' query parameter.");
+  }
+
+  const filename = `${name} EPT CERTIFICATE.jpg`;
+  const filePath = path.join(certificatesDir, filename);
+
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return res.status(404).send("No certificate found for this user.");
+    }
+
+    res.download(filePath, `${name}_Certificate.jpg`, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res.status(500).send("Error downloading the certificate.");
+      }
+    });
+  });
+});
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Certificate server running at http://localhost:${PORT}`);
 });
